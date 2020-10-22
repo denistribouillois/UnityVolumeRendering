@@ -10,8 +10,20 @@ namespace UnityVolumeRendering
         public int dimZ = 0;
         public int bytesToSkip = 0;
         public DataContentFormat format = DataContentFormat.Uint8;
+        public Endianness endianness = Endianness.LittleEndian;
     }
 
+    /// <summary>
+    /// .ini-file reader for raw datasets.
+    /// .ini files contains information about how to import a raw dataset file.
+    /// Example file:
+    ///   dimx:256
+    ///   dimy:256
+    ///   dimz:68
+    ///   skip:28
+    ///   format:uint8
+    /// "skip" defines how many bytes to skip (file header) - it should be 0 if the file has no header, which is often the case.
+    /// </summary>
     public class DatasetIniReader
     {
         public static DatasetIniData ParseIniFile(string filePath)
@@ -41,9 +53,9 @@ namespace UnityVolumeRendering
                 else if (name == "skip")
                     Int32.TryParse(value, out iniData.bytesToSkip);
                 else if (name == "format")
-                {
                     iniData.format = GetFormatByName(value);
-                }
+                else if (name == "endianness")
+                    iniData.endianness = GetEndiannessByName(value);
             }
 
             return iniData;
@@ -67,6 +79,19 @@ namespace UnityVolumeRendering
                     return DataContentFormat.Uint8;
                 default:
                     return DataContentFormat.Uint8;
+            }
+        }
+
+        private static Endianness GetEndiannessByName(string name)
+        {
+            switch (name)
+            {
+                case "bigendian":
+                    return Endianness.BigEndian;
+                case "littleendian":
+                    return Endianness.LittleEndian;
+                default:
+                    return Endianness.LittleEndian;
             }
         }
     }

@@ -13,12 +13,14 @@ namespace UnityVolumeRendering
         private int selectedColPointIndex = -1;
 
         private VolumeRenderedObject volRendObject = null;
+        private Texture2D histTex = null;
 
         [MenuItem("Volume Rendering/1D Transfer Function")]
-        static void ShowWindow()
+        public static void ShowWindow()
         {
-            TransferFunction2DEditorWindow tf2dWnd = (TransferFunction2DEditorWindow)EditorWindow.GetWindow(typeof(TransferFunction2DEditorWindow));
-            if (tf2dWnd != null)
+            // Close all (if any) 2D TF editor windows
+            TransferFunction2DEditorWindow[] tf2dWnds = Resources.FindObjectsOfTypeAll<TransferFunction2DEditorWindow>();
+            foreach (TransferFunction2DEditorWindow tf2dWnd in tf2dWnds)
                 tf2dWnd.Close();
 
             TransferFunctionEditorWindow wnd = (TransferFunctionEditorWindow)EditorWindow.GetWindow(typeof(TransferFunctionEditorWindow));
@@ -49,6 +51,9 @@ namespace UnityVolumeRendering
                 if (volRendObject != null)
                     Selection.objects = new Object[] { volRendObject.gameObject };
             }
+
+            if(volRendObject != null)
+                volRendObject.SetTransferFunctionMode(TFRenderMode.TF1D);
         }
 
         private void OnGUI()
@@ -64,13 +69,20 @@ namespace UnityVolumeRendering
             Event currentEvent = new Event(Event.current);
 
             Color oldColour = GUI.color;
-            float bgWidth = Mathf.Min(this.position.width - 20.0f, (this.position.height - 50.0f) * 2.0f);
-            Rect bgRect = new Rect(0.0f, 0.0f, bgWidth, bgWidth * 0.5f);
+            
+            float contentWidth = Mathf.Min(this.position.width - 20.0f, (this.position.height - 100.0f) * 2.0f);
+            float contentHeight = contentWidth * 0.5f;
+            
+            Rect bgRect = new Rect(0.0f, 0.0f, contentWidth, contentHeight);
 
+            // TODO:
             tf.GenerateTexture();
 
+            if(histTex == null)
+                histTex = HistogramTextureGenerator.GenerateHistogramTexture(volRendObject.dataset);
+
             tfGUIMat.SetTexture("_TFTex", tf.GetTexture());
-            tfGUIMat.SetTexture("_HistTex", tf.histogramTexture);
+            tfGUIMat.SetTexture("_HistTex", histTex);
             Graphics.DrawTexture(bgRect, tf.GetTexture(), tfGUIMat);
 
             Texture2D tfTexture = tf.GetTexture();
@@ -161,15 +173,29 @@ namespace UnityVolumeRendering
             if (selectedColPointIndex != -1)
             {
                 TFColourControlPoint colPoint = tf.colourControlPoints[selectedColPointIndex];
-                colPoint.colourValue = EditorGUI.ColorField(new Rect(bgRect.x, bgRect.y + bgRect.height + 50, 100.0f, 40.0f), colPoint.colourValue);
+                colPoint.colourValue = EditorGUI.ColorField(new Rect(150, bgRect.y + bgRect.height + 50, 100.0f, 40.0f), colPoint.colourValue);
                 tf.colourControlPoints[selectedColPointIndex] = colPoint;
             }
-            GUI.skin.label.wordWrap = false;
-            GUI.Label(new Rect(0.0f, bgRect.y + bgRect.height + 60.0f, 700.0f, 30.0f), "Left click to select and move a control point. Right click to add a control point, and ctrl + right click to delete.");
 
-            // TEST!!! TODO
-            volRendObject.GetComponent<MeshRenderer>().sharedMaterial.SetTexture("_TFTex", tfTexture);
-            volRendObject.GetComponent<MeshRenderer>().sharedMaterial.DisableKeyword("TF2D_ON");
+            if(GUI.Button(new Rect(0.0f, bgRect.y + bgRect.height + 50.0f, 70.0f, 30.0f), "Save"))
+            {
+                string filepath = EditorUtility.SaveFilePanel("Save transfer function", "", "default.tf", "tf");
+                if(filepath != "")
+                    TransferFunctionDatabase.SaveTransferFunction(tf, filepath);
+            }
+            if(GUI.Button(new Rect(75.0f, bgRect.y + bgRect.height + 50.0f, 70.0f, 30.0f), "Load"))
+            {
+                string filepath = EditorUtility.OpenFilePanel("Save transfer function", "", "tf");
+                if(filepath != "")
+                {
+                    TransferFunction newTF = TransferFunctionDatabase.LoadTransferFunction(filepath);
+                    if(newTF != null)
+                        volRendObject.transferFunction = tf = newTF;
+                }
+            }
+
+            GUI.skin.label.wordWrap = false;    
+            GUI.Label(new Rect(0.0f, bgRect.y + bgRect.height + 85.0f, 700.0f, 30.0f), "Left click to select and move a control point. Right click to add a control point, and ctrl + right click to delete.");
 
             GUI.color = oldColour;
         }

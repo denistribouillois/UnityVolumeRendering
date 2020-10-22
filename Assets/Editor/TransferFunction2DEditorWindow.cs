@@ -15,10 +15,11 @@ namespace UnityVolumeRendering
         private VolumeRenderedObject volRendObject = null;
 
         [MenuItem("Volume Rendering/2D Transfer Function")]
-        static void ShowWindow()
+        public static void ShowWindow()
         {
-            TransferFunctionEditorWindow tf1dWnd = (TransferFunctionEditorWindow)EditorWindow.GetWindow(typeof(TransferFunctionEditorWindow));
-            if (tf1dWnd != null)
+            // Close all (if any) 1D TF editor windows
+            TransferFunctionEditorWindow[] tf1dWnds = Resources.FindObjectsOfTypeAll<TransferFunctionEditorWindow>();
+            foreach (TransferFunctionEditorWindow tf1dWnd in tf1dWnds)
                 tf1dWnd.Close();
 
             TransferFunction2DEditorWindow tf2dWnd = (TransferFunction2DEditorWindow)EditorWindow.GetWindow(typeof(TransferFunction2DEditorWindow));
@@ -45,6 +46,9 @@ namespace UnityVolumeRendering
                 if (volRendObject != null)
                     Selection.objects = new Object[] { volRendObject.gameObject };
             }
+
+            if(volRendObject != null)
+                volRendObject.SetTransferFunctionMode(TFRenderMode.TF2D);
         }
 
         private void OnGUI()
@@ -107,7 +111,7 @@ namespace UnityVolumeRendering
             }
 
             // Add new rectangle
-            if (GUI.Button(new Rect(startX, startY + 100, 150.0f, 40.0f), "Add rectangle"))
+            if (GUI.Button(new Rect(startX, startY + 100, 110.0f, 30.0f), "Add rectangle"))
             {
                 tf2d.AddBox(0.1f, 0.1f, 0.8f, 0.8f, Color.white, 0.5f);
                 needsRegenTexture = true;
@@ -115,10 +119,30 @@ namespace UnityVolumeRendering
             // Remove selected shape
             if (selectedBoxIndex != -1)
             {
-                if (GUI.Button(new Rect(startX, startY + 150, 150.0f, 40.0f), "Remove selected shape"))
+                if (GUI.Button(new Rect(startX, startY + 140, 110.0f, 30.0f), "Remove selected shape"))
                 {
                     tf2d.boxes.RemoveAt(selectedBoxIndex);
                     needsRegenTexture = true;
+                }
+            }
+
+            if(GUI.Button(new Rect(startX, startY + 180, 110.0f, 30.0f), "Save"))
+            {
+                string filepath = EditorUtility.SaveFilePanel("Save transfer function", "", "default.tf2d", "tf2d");
+                if(filepath != "")
+                    TransferFunctionDatabase.SaveTransferFunction2D(tf2d, filepath);
+            }
+            if(GUI.Button(new Rect(startX, startY + 220, 110.0f, 30.0f), "Load"))
+            {
+                string filepath = EditorUtility.OpenFilePanel("Save transfer function", "", "tf2d");
+                if(filepath != "")
+                {
+                    TransferFunction2D newTF = TransferFunctionDatabase.LoadTransferFunction2D(filepath);
+                    if(newTF != null)
+                    {
+                        volRendObject.transferFunction2D = tf2d = newTF;
+                        needsRegenTexture = true;
+                    }
                 }
             }
 
@@ -128,8 +152,6 @@ namespace UnityVolumeRendering
                 tf2d.GenerateTexture();
                 needsRegenTexture = false;
             }
-            volRendObject.GetComponent<MeshRenderer>().sharedMaterial.SetTexture("_TFTex", tf2d.GetTexture());
-            volRendObject.GetComponent<MeshRenderer>().sharedMaterial.EnableKeyword("TF2D_ON");
 
             return;
         }
